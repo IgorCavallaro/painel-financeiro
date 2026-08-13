@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lançar Gasto</title>
+
+<!-- PWA: instalável via "Adicionar à Tela de Início", sem precisar publicar em nenhuma loja -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F172A">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lançar Gasto">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --fin-navy:#0F172A;
+  --fin-blue:#2563EB;
+  --fin-green:#16A34A;
+  --fin-amber:#F59E0B;
+  --fin-red:#DC2626;
+  --fin-off-white:#F8FAFC;
+  --fin-gray-border:#E5E7EB;
+  --fin-text-dark:#1F2937;
+  --fin-text-muted:#6B7280;
+  --fin-blue-fill:#DBEAFE;
+  --fin-green-fill:#DCFCE7;
+  --fin-red-fill:#FEE2E2;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body{
+  margin:0; padding:0; background:var(--fin-off-white); font-family:'Inter',sans-serif;
+  color:var(--fin-text-dark);
+  /* respeita a área segura do notch/status bar em iOS quando instalado como app */
+  padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);
+}
+
+main{ max-width:480px; margin:0 auto; padding:20px 18px 40px; min-height:100vh; }
+
+.top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+.top h1{ font-size:18px; font-weight:800; color:var(--fin-navy); margin:0; }
+.top a{ font-size:12px; color:var(--fin-blue); font-weight:600; text-decoration:none; }
+.top button{ border:none; background:none; font-size:12px; color:var(--fin-text-muted); font-weight:600; cursor:pointer; padding:0; }
+
+.resumo-hoje{
+  background:#fff; border:1px solid var(--fin-gray-border); border-radius:12px;
+  padding:14px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;
+}
+.resumo-hoje .label{ font-size:12px; color:var(--fin-text-muted); }
+.resumo-hoje .val{ font-size:18px; font-weight:800; color:var(--fin-navy); }
+
+.tipo-toggle{ display:flex; gap:8px; margin-bottom:18px; }
+.tipo-toggle button{
+  flex:1; padding:13px; border-radius:10px; border:1.5px solid var(--fin-gray-border);
+  background:#fff; font-family:'Inter',sans-serif; font-size:14px; font-weight:700;
+  color:var(--fin-text-muted); cursor:pointer;
+}
+.tipo-toggle button.active.despesa{ background:var(--fin-red-fill); border-color:#FCA5A5; color:var(--fin-red); }
+.tipo-toggle button.active.receita{ background:var(--fin-green-fill); border-color:#86EFAC; color:var(--fin-green); }
+
+label{ display:block; font-size:12px; font-weight:600; color:var(--fin-text-muted); margin-bottom:6px; }
+label .obrigatorio{ color:var(--fin-red); margin-left:2px; }
+input,select{
+  width:100%; padding:13px 14px; border:1px solid var(--fin-gray-border); border-radius:10px;
+  font-family:'Inter',sans-serif; font-size:15px; color:var(--fin-text-dark); background:#fff;
+  -webkit-appearance:none; appearance:none;
+}
+select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%236B7280' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 14px center; padding-right:36px;
+}
+input:focus,select:focus{ outline:none; border-color:var(--fin-blue); }
+input.invalido,select.invalido{ border-color:var(--fin-red); background:var(--fin-red-fill); }
+.field{ margin-bottom:16px; }
+.field-hint{ font-size:11px; color:var(--fin-text-muted); margin-top:5px; }
+
+#f-valor{ font-size:30px; font-weight:800; padding:16px 14px; text-align:center; color:var(--fin-navy); letter-spacing:-0.01em; }
+#f-valor::placeholder{ color:#CBD5E1; font-weight:700; }
+
+.btn{
+  width:100%; background:var(--fin-blue); color:#fff; border:none; border-radius:12px;
+  padding:15px; font-family:'Inter',sans-serif; font-size:15px; font-weight:700; cursor:pointer;
+  margin-top:6px;
+}
+.btn:active{ background:#1D4ED8; }
+.btn:disabled{ opacity:0.6; }
+
+.password-field{ position:relative; }
+.password-field input{ padding-right:44px; }
+.toggle-senha{
+  position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+  background:none; border:none; border-radius:6px; cursor:pointer; color:var(--fin-text-muted); padding:0;
+}
+
+.alert-box{
+  background:var(--fin-red-fill); border:1px solid #FCA5A5; border-radius:10px;
+  padding:12px 14px; margin-bottom:16px; font-size:13px; color:#991B1B;
+}
+
+.recentes{ margin-top:26px; }
+.recentes h2{ font-size:13px; font-weight:700; color:var(--fin-text-muted); text-transform:uppercase; letter-spacing:0.04em; margin:0 0 10px; }
+.item-recente{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  background:#fff; border:1px solid var(--fin-gray-border); border-radius:10px;
+  padding:11px 13px; margin-bottom:8px; font-size:13px;
+}
+.item-recente .info{ min-width:0; }
+.item-recente .cat{ font-weight:600; color:var(--fin-navy); }
+.item-recente .meta{ color:var(--fin-text-muted); font-size:11px; margin-top:1px; }
+.item-recente .valor{ font-weight:700; white-space:nowrap; }
+.item-recente .valor.despesa{ color:var(--fin-red); }
+.item-recente .valor.receita{ color:var(--fin-green); }
+.item-recente .del{ border:none; background:none; color:#9CA3AF; font-size:16px; cursor:pointer; padding:4px; line-height:1; flex-shrink:0; }
+
+.login-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+.login-box{ width:100%; max-width:360px; background:#fff; border:1px solid var(--fin-gray-border); border-radius:16px; padding:28px; }
+.login-box h1{ font-size:19px; font-weight:800; color:var(--fin-navy); margin:0 0 6px; text-align:center; }
+.login-box .sub{ font-size:13px; color:var(--fin-text-muted); margin:0 0 20px; text-align:center; }
+
+.toast{
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:var(--fin-navy); color:#fff; padding:10px 20px; border-radius:8px;
+  font-size:13px; font-weight:600; opacity:0; transition:opacity .3s; pointer-events:none; z-index:20;
+}
+.toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="tela-login" class="login-wrap">
+  <div class="login-box">
+    <h1>Lançar Gasto</h1>
+    <p class="sub">Entre com a mesma conta do Painel Financeiro 50/30/20.</p>
+    <div id="login-erro" style="display:none;"></div>
+    <div class="field"><label>E-mail</label><input type="email" id="login-email" autocomplete="username"></div>
+    <div class="field">
+      <label>Senha</label>
+      <div class="password-field">
+        <input type="password" id="login-senha" autocomplete="current-password">
+        <button type="button" class="toggle-senha" onclick="alternarSenha('login-senha', this)" aria-label="Mostrar senha"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+      </div>
+    </div>
+    <button class="btn" id="btn-entrar" onclick="fazerLogin()">Entrar</button>
+    <p class="sub" style="margin-top:14px;">Ainda não tem conta? <a href="index.html" style="color:var(--fin-blue); font-weight:600;">Crie no painel completo</a>.</p>
+  </div>
+</div>
+
+<div id="app-container" style="display:none;">
+<main>
+  <div class="top">
+    <h1>Lançar Gasto</h1>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <a href="index.html">Painel completo →</a>
+      <button onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="resumo-hoje">
+    <span class="label">Gasto hoje</span>
+    <span class="val" id="resumo-gasto-hoje">R$ 0,00</span>
+  </div>
+
+  <div id="form-erro" style="display:none;"></div>
+
+  <div class="field">
+    <label>Tipo<span class="obrigatorio">*</span></label>
+    <div class="tipo-toggle">
+      <button type="button" class="despesa active" id="btn-tipo-despesa" onclick="selecionarTipo('Despesa')">− Despesa</button>
+      <button type="button" class="receita" id="btn-tipo-receita" onclick="selecionarTipo('Receita')">+ Receita</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="f-valor">Valor<span class="obrigatorio">*</span></label>
+    <input type="text" inputmode="numeric" id="f-valor" placeholder="R$ 0,00">
+  </div>
+
+  <div class="field">
+    <label for="f-categoria">Categoria<span class="obrigatorio">*</span></label>
+    <select id="f-categoria"></select>
+    <p class="field-hint">A lista mostra todas as categorias cadastradas no painel — não filtra por grupo.</p>
+  </div>
+
+  <div class="field">
+    <label for="f-data">Data<span class="obrigatorio">*</span></label>
+    <input type="date" id="f-data">
+  </div>
+
+  <div class="field">
+    <label for="f-obs">Observação (opcional)</label>
+    <input type="text" id="f-obs" placeholder="Ex: mercado">
+  </div>
+
+  <button class="btn" id="btn-salvar" onclick="salvarLancamento()">Salvar lançamento</button>
+
+  <div class="recentes">
+    <h2>Últimos lançamentos</h2>
+    <div id="lista-recentes"></div>
+  </div>
+</main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js" onerror="console.warn('config.js não encontrado')"></script>
+<script>
+const SUPABASE_URL = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_URL) || '';
+const SUPABASE_ANON_KEY = (window.APP_CONFIG && window.APP_CONFIG.SUPABASE_ANON_KEY) || '';
+let sb = null;
+let usuarioAtual = null;
+let categorias = [];
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+function formatarMoeda(v){ return (v||0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+function normalizarNumero(v){ return Number(v)||0; }
+
+// ---- Máscara de moeda: digita números, o campo já formata como R$ 0,00 ----
+function formatarInputMoeda(el){
+  let digitos = el.value.replace(/\D/g,'').replace(/^0+(?=\d)/,'');
+  if(!digitos){
+    el.value = '';
+    el.dataset.valor = '';
+    return;
+  }
+  const valorNumerico = parseInt(digitos,10) / 100;
+  el.dataset.valor = valorNumerico;
+  el.value = formatarMoeda(valorNumerico);
+  requestAnimationFrame(()=>{ try{ el.setSelectionRange(el.value.length, el.value.length); }catch(e){} });
+}
+document.getElementById('f-valor').addEventListener('input', e=>formatarInputMoeda(e.target));
+document.getElementById('f-valor').addEventListener('input', e=>marcarInvalido('f-valor', false));
+document.getElementById('f-categoria').addEventListener('change', ()=>marcarInvalido('f-categoria', false));
+document.getElementById('f-data').addEventListener('input', ()=>marcarInvalido('f-data', false));
+
+const ICONE_OLHO_ABERTO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+const ICONE_OLHO_FECHADO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a20.3 20.3 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
+function alternarSenha(inputId, btn){
+  const input = document.getElementById(inputId);
+  const vaiMostrar = input.type === 'password';
+  input.type = vaiMostrar ? 'text' : 'password';
+  btn.innerHTML = vaiMostrar ? ICONE_OLHO_FECHADO : ICONE_OLHO_ABERTO;
+}
+
+function checarConfiguracao(){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY){
+    mostrarErroLogin('Backend não configurado. Confira se config.js está na mesma pasta deste arquivo.');
+    return false;
+  }
+  if(!sb) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return true;
+}
+
+function mostrarErroLogin(msg){
+  const el = document.getElementById('login-erro');
+  el.innerHTML = `<div class="alert-box">${msg}</div>`;
+  el.style.display = 'block';
+}
+function mostrarErroForm(msg){
+  const el = document.getElementById('form-erro');
+  el.innerHTML = `<div class="alert-box">${msg}</div>`;
+  el.style.display = 'block';
+}
+function limparErroForm(){
+  const el = document.getElementById('form-erro');
+  el.style.display = 'none'; el.innerHTML = '';
+}
+
+function traduzErroAuth(msg){
+  const mapa = {
+    'Invalid login credentials': 'E-mail ou senha incorretos.',
+    'Email not confirmed': 'Confirme seu e-mail antes de entrar.',
+  };
+  return mapa[msg] || msg;
+}
+
+async function fazerLogin(){
+  if(!checarConfiguracao()) return;
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  if(!email || !senha){ mostrarErroLogin('Preencha e-mail e senha.'); return; }
+
+  const btn = document.getElementById('btn-entrar');
+  btn.disabled = true; btn.textContent = 'Entrando...';
+  try{
+    const { data, error } = await sb.auth.signInWithPassword({ email, password:senha });
+    if(error) throw error;
+    await iniciarSessao(data.user);
+  }catch(e){ mostrarErroLogin(traduzErroAuth(e.message)); }
+  finally{ btn.disabled = false; btn.textContent = 'Entrar'; }
+}
+
+async function iniciarSessao(user){
+  usuarioAtual = { id:user.id, email:user.email };
+  document.getElementById('tela-login').style.display = 'none';
+  document.getElementById('app-container').style.display = 'block';
+  document.getElementById('f-data').value = new Date().toISOString().slice(0,10);
+  await carregarCategorias();
+  selecionarTipo('Despesa');
+  await atualizarRecentesEResumo();
+}
+
+async function sair(){
+  if(sb) await sb.auth.signOut();
+  usuarioAtual = null;
+  document.getElementById('app-container').style.display = 'none';
+  document.getElementById('tela-login').style.display = 'flex';
+}
+
+async function carregarCategorias(){
+  const { data, error } = await sb.from('categorias').select('*').order('grupo').order('nome');
+  if(error){ showToast('Erro ao carregar categorias: '+error.message); return; }
+  categorias = data || [];
+  const porGrupo = {};
+  categorias.forEach(c=>{ (porGrupo[c.grupo] = porGrupo[c.grupo]||[]).push(c); });
+  const ordemGrupos = ['Necessário','Desejado','Investimento'];
+  document.getElementById('f-categoria').innerHTML =
+    ordemGrupos.filter(g=>porGrupo[g]).map(g=>
+      `<optgroup label="${g}">${porGrupo[g].map(c=>`<option>${c.nome}</option>`).join('')}</optgroup>`
+    ).join('') || '<option value="">Cadastre uma categoria no painel</option>';
+}
+
+function selecionarTipo(tipo){
+  document.getElementById('btn-tipo-despesa').classList.toggle('active', tipo==='Despesa');
+  document.getElementById('btn-tipo-receita').classList.toggle('active', tipo==='Receita');
+  document.getElementById('f-valor').dataset.tipo = tipo;
+}
+
+function marcarInvalido(id, invalido){
+  const el = document.getElementById(id);
+  el.classList.toggle('invalido', invalido);
+}
+
+async function salvarLancamento(){
+  limparErroForm();
+  const tipo = document.getElementById('f-valor').dataset.tipo || 'Despesa';
+  const valorEl = document.getElementById('f-valor');
+  const valor = normalizarNumero(valorEl.dataset.valor);
+  const data = document.getElementById('f-data').value;
+  const obs = document.getElementById('f-obs').value.trim();
+  const categoria = document.getElementById('f-categoria').value;
+
+  const camposInvalidos = [];
+  if(!valor) camposInvalidos.push('f-valor');
+  if(!categoria) camposInvalidos.push('f-categoria');
+  if(!data) camposInvalidos.push('f-data');
+
+  ['f-valor','f-categoria','f-data'].forEach(id => marcarInvalido(id, camposInvalidos.includes(id)));
+
+  if(camposInvalidos.length){
+    mostrarErroForm('Preencha todos os campos obrigatórios (marcados em vermelho) antes de salvar.');
+    document.getElementById(camposInvalidos[0]).focus();
+    return;
+  }
+
+  const btn = document.getElementById('btn-salvar');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try{
+    const { error } = await sb.from('transacoes').insert({
+      user_id: usuarioAtual.id, data, tipo, categoria, valor, obs
+    });
+    if(error) throw error;
+    showToast((tipo==='Receita'?'Receita':'Despesa')+' salva ✓');
+    // Limpa só valor/observação — mantém tipo, categoria e data pra lançar o próximo mais rápido
+    valorEl.value = ''; valorEl.dataset.valor = '';
+    document.getElementById('f-obs').value = '';
+    valorEl.focus();
+    await atualizarRecentesEResumo();
+  }catch(e){ mostrarErroForm('Erro ao salvar: '+e.message); }
+  finally{ btn.disabled = false; btn.textContent = 'Salvar lançamento'; }
+}
+
+async function excluirRecente(id){
+  try{
+    const { error } = await sb.from('transacoes').delete().eq('id', id).eq('user_id', usuarioAtual.id);
+    if(error) throw error;
+    showToast('Lançamento excluído');
+    await atualizarRecentesEResumo();
+  }catch(e){ showToast('Erro ao excluir: '+e.message); }
+}
+
+async function atualizarRecentesEResumo(){
+  const { data, error } = await sb.from('transacoes')
+    .select('*').eq('user_id', usuarioAtual.id)
+    .order('data', { ascending:false }).order('id', { ascending:false }).limit(5);
+  if(error){ showToast('Erro ao carregar lançamentos: '+error.message); return; }
+
+  document.getElementById('lista-recentes').innerHTML = (data||[]).map(t=>`
+    <div class="item-recente">
+      <div class="info">
+        <div class="cat">${t.tipo==='Receita' ? 'Receita' : (t.categoria||'Despesa')}</div>
+        <div class="meta">${t.data}${t.obs ? ' · '+t.obs : ''}</div>
+      </div>
+      <span class="valor ${t.tipo==='Receita'?'receita':'despesa'}">${t.tipo==='Receita'?'+':'−'} ${formatarMoeda(t.valor)}</span>
+      <button class="del" onclick="excluirRecente(${t.id})" aria-label="Excluir">✕</button>
+    </div>
+  `).join('') || '<p style="color:#9CA3AF; font-size:13px;">Nenhum lançamento ainda.</p>';
+
+  const hoje = new Date().toISOString().slice(0,10);
+  const { data: doDia, error: erroDia } = await sb.from('transacoes')
+    .select('valor,tipo').eq('user_id', usuarioAtual.id).eq('data', hoje);
+  if(!erroDia){
+    const totalHoje = (doDia||[]).filter(t=>t.tipo==='Despesa').reduce((a,t)=>a+normalizarNumero(t.valor),0);
+    document.getElementById('resumo-gasto-hoje').textContent = formatarMoeda(totalHoje);
+  }
+}
+
+async function iniciar(){
+  if(!checarConfiguracao()) return;
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session && session.user) await iniciarSessao(session.user);
+  }catch(e){ /* segue pra tela de login normalmente */ }
+}
+iniciar();
+</script>
+</body>
+</html>
