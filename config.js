@@ -1,4 +1,4 @@
-// Copiado de config.example.js e preenchido com a URL real do Apps Script.
 window.APP_CONFIG = {
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbyiAiBuJC28D84EdhXpr_F6ulcGxIKgDZk8vBThh05tAxrLEcnFiz5IKIQGgmmTxQYf/exec'
+  SUPABASE_URL: 'https://jeolbmmpcnhraaflvjmc.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_ZLZ7MkIXuPCeFd1Ig3KFUg_vw94TCyR'
 };
